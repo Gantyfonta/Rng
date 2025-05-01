@@ -1,0 +1,299 @@
+Rarity Rng
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rarity RNG</title>
+  <style>
+    body {
+      font-family: 'Comic Sans MS', cursive, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #d0f0fd, #fdf5e6);
+      color: #333;
+      transition: background-color 0.5s ease;
+    }
+    button {
+      padding: 12px 25px;
+      font-size: 20px;
+      cursor: pointer;
+      margin-top: 30px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(to bottom, #ffcc00, #ff9900);
+      color: #fff;
+      font-weight: bold;
+      box-shadow: 0 5px #cc7a00;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: scale(1.05);
+    }
+    .result {
+      margin-top: 20px;
+      font-size: 30px;
+      font-weight: bold;
+      color: #3366cc;
+      transition: transform 0.3s ease;
+      text-shadow: 1px 1px #ccc;
+    }
+    .result-mythic {
+      color: red !important;
+      text-shadow: 0 0 10px red, 0 0 20px red;
+    }
+    .log {
+      margin-top: 40px;
+      max-height: 200px;
+      overflow-y: auto;
+      border-top: 2px dashed #ccc;
+      padding-top: 20px;
+      font-size: 18px;
+    }
+    .raritydex-toggle {
+      position: fixed;
+      top: 20px;
+      right: 150px;
+      z-index: 1100;
+    }
+    .roll-counter {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: #fff8dc;
+      border: 2px solid #ffa500;
+      padding: 10px 15px;
+      border-radius: 10px;
+      font-weight: bold;
+      font-size: 18px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    .raritydex {
+      display: none;
+      position: fixed;
+      top: 70px;
+      right: 20px;
+      width: 350px;
+      background-color: #fff8dc;
+      border-radius: 15px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.2);
+      padding: 20px;
+      max-height: 85vh;
+      overflow-y: auto;
+      z-index: 1000;
+      border: 3px solid #ffa500;
+    }
+    .rarity-entry {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px;
+      border-bottom: 1px dashed #aaa;
+      font-size: 16px;
+    }
+    .rarity-entry:last-child {
+      border-bottom: none;
+    }
+    .rarity-name {
+      font-weight: bold;
+    }
+    .rarity-info {
+      text-align: right;
+    }
+    .market-menu {
+      display: none;
+      position: fixed;
+      top: 100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #fff;
+      border: 2px solid #333;
+      padding: 20px;
+      z-index: 2000;
+      width: 400px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .market-menu h3 {
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1 style="font-size: 40px; color: #ff6600; text-shadow: 2px 2px #ffe0b3;">
+    Rarity R<span onclick="toggleMarket()" style="cursor:pointer; color:#000; text-decoration:underline">N</span>G
+  </h1>
+  <button onclick="rollRNG()">Roll</button>
+  <div class="result" id="result"></div>
+  <div class="log" id="log"></div>
+
+  <div class="raritydex-toggle">
+    <button onclick="toggleRaritydex()">Toggle Rarity Dex</button>
+  </div>
+
+  <div class="roll-counter" id="roll-counter">Rolls: 0</div>
+
+  <div class="raritydex" id="raritydex">
+    <h2>Rarity Dex</h2>
+    <div id="raritydex-entries"></div>
+    <button onclick="sellExtras()">Sell Extras</button>
+  </div>
+
+  <div class="market-menu" id="market">
+    <h3>Black Market</h3>
+    <div id="market-items"></div>
+  </div>
+
+  <audio id="roll-sound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+  <audio id="rare-sound" src="https://actions.google.com/sounds/v1/cartoon/concussive_hit_guitar_boing.ogg"></audio>
+
+  <script>
+    const rngItems = [
+      { name: 'Common', chance: 50, description: 'Oh look, it’s Common.', color: '#e0e0e0', price: 1, sell: 1 },
+      { name: 'Uncommon', chance: 25, description: 'Not the worst.', color: '#a0e0a0', price: 2, sell: 1 },
+      { name: 'Rare', chance: 15, description: 'Oooh, shiny.', color: '#80a0ff', price: 4, sell: 2 },
+      { name: 'Deluxe', chance: 10, description: 'Fancy Rare.', color: '#d0a0ff', price: 6, sell: 3 },
+      { name: 'Legendary', chance: 5, description: 'Bribed the game?', color: '#ffd700', price: 10, sell: 5 },
+      { name: 'Mythic', chance: 1, description: 'Buy a lottery ticket.', color: '#ff4040', price: 20, sell: 10 },
+      { name: 'Trash', chance: 75, description: 'Even garbage has standards.', color: '#999999', price: 0, sell: 0 },
+      { name: 'Glitched', chance: 0.5, description: 'Reality is bending.', color: '#00ffff', price: 50, sell: 20 },
+      { name: 'Nothing', chance: 100, description: 'You got nothing.', color: '#ffffff', price: 0, sell: 0 }
+    ];
+
+    const achievements = [
+      { name: 'First Roll', description: 'Roll once.', price: 1 },
+      { name: 'Hundred Club', description: 'Roll 100 times.', price: 10 }
+    ];
+
+    let counts = JSON.parse(localStorage.getItem('rngCounts')) || {};
+    let totalRolls = parseInt(localStorage.getItem('totalRolls')) || 0;
+    let coins = parseInt(localStorage.getItem('coins')) || 0;
+    const rollCounter = document.getElementById('roll-counter');
+
+    rngItems.forEach(item => {
+      if (!counts[item.name]) counts[item.name] = 0;
+    });
+
+    function saveCounts() {
+      localStorage.setItem('rngCounts', JSON.stringify(counts));
+      localStorage.setItem('totalRolls', totalRolls);
+      localStorage.setItem('coins', coins);
+    }
+
+    function toggleRaritydex() {
+      const dex = document.getElementById('raritydex');
+      dex.style.display = dex.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function toggleMarket() {
+      const market = document.getElementById('market');
+      market.style.display = market.style.display === 'none' ? 'block' : 'none';
+      renderMarket();
+    }
+
+    function rollRNG() {
+      const resultElement = document.getElementById('result');
+      const logElement = document.getElementById('log');
+      const rollSound = document.getElementById('roll-sound');
+      const rareSound = document.getElementById('rare-sound');
+
+      rollSound.play();
+      let found = 'Nothing';
+      const sortedItems = rngItems.sort((a, b) => b.chance - a.chance);
+      for (const item of sortedItems) {
+        if (Math.random() * 100 < item.chance) {
+          found = item.name;
+          counts[found]++;
+          totalRolls++;
+          saveCounts();
+          break;
+        }
+      }
+      if (["Legendary", "Mythic", "Glitched"].includes(found)) rareSound.play();
+
+      resultElement.innerText = `You rolled: ${found}`;
+      resultElement.classList.remove('result-mythic');
+      if (found === 'Mythic') resultElement.classList.add('result-mythic');
+      resultElement.style.transform = 'scale(1.2)';
+      setTimeout(() => resultElement.style.transform = 'scale(1)', 150);
+
+      const entry = document.createElement('div');
+      entry.innerText = `Rolled: ${found}`;
+      logElement.prepend(entry);
+      updateRaritydex();
+      updateRollCounter();
+    }
+
+    function updateRaritydex() {
+      const dex = document.getElementById('raritydex-entries');
+      dex.innerHTML = '';
+      rngItems.forEach(item => {
+        const entry = document.createElement('div');
+        entry.className = 'rarity-entry';
+        const left = document.createElement('div');
+        left.className = 'rarity-name';
+        left.innerText = counts[item.name] > 0 ? item.name : '???';
+        const right = document.createElement('div');
+        right.className = 'rarity-info';
+        right.innerHTML = `
+          ${counts[item.name] || 0}x<br />
+          ${item.chance}% Chance<br />
+          ${counts[item.name] > 0 ? `"${item.description}"` : ''}<br />
+          <button onclick="document.body.style.background='${item.color}'">Set Background</button>
+        `;
+        entry.appendChild(left);
+        entry.appendChild(right);
+        dex.appendChild(entry);
+      });
+    }
+
+    function updateRollCounter() {
+      rollCounter.innerText = `Rolls: ${totalRolls} | Coins: ${coins}`;
+    }
+
+    function sellExtras() {
+      rngItems.forEach(item => {
+        if (counts[item.name] > 1) {
+          coins += (counts[item.name] - 1) * item.sell;
+          counts[item.name] = 1;
+        }
+      });
+      saveCounts();
+      updateRaritydex();
+      updateRollCounter();
+    }
+
+    function renderMarket() {
+      const container = document.getElementById('market-items');
+      container.innerHTML = '';
+      rngItems.forEach(item => {
+        if (counts[item.name] > 0) {
+          const div = document.createElement('div');
+          div.innerHTML = `${item.name} - ${item.price} coins <button onclick="buyItem('${item.name}', ${item.price})">Buy</button>`;
+          container.appendChild(div);
+        }
+      });
+      achievements.forEach(ach => {
+        const div = document.createElement('div');
+        div.innerHTML = `Achievement: ${ach.name} - ${ach.price} coins<br>${ach.description} <button onclick="buyItem('${ach.name}', ${ach.price})">Buy</button>`;
+        container.appendChild(div);
+      });
+    }
+
+    function buyItem(name, price) {
+      if (coins >= price) {
+        coins -= price;
+        alert(`You bought ${name}`);
+        saveCounts();
+        updateRollCounter();
+      } else {
+        alert('Not enough coins!');
+      }
+    }
+
+    updateRaritydex();
+    updateRollCounter();
+  </script>
+</body>
+</html>
